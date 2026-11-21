@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8f8f3">
+  <meta name="description" content="Kombiniere deinen eigenen Kleiderschrank an einer Figur und speichere deine Lieblingslooks.">
+  <title>Kleiderstudio</title>
+  <link rel="icon" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./weather.js" defer></script>
+  <script src="./data.js" defer></script>
+  <script src="./drawing.js" defer></script>
+  <script src="./reference-image.js" defer></script>
+  <script src="./photo-store.js" defer></script>
+  <script src="./photo-weights.js" defer></script>
+  <script src="./photo-recognition.js" defer></script>
+  <script src="./fitting.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main" data-action="skip">Zum Inhalt</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="#studio" aria-label="Kleiderstudio – Startseite">
+        <span class="brand-mark" data-icon="hanger"></span><span>Kleider<span class="brand-accent">studio</span></span>
+      </a>
+      <nav id="main-nav" aria-label="Hauptnavigation">
+        <a href="#studio" data-page-link="studio"><span data-icon="sparkles"></span>Studio</a>
+        <a href="#schrank" data-page-link="schrank"><span data-icon="hanger"></span>Schrank</a>
+        <a href="#looks" data-page-link="looks"><span data-icon="bookmark"></span>Looks</a>
+        <a href="#anprobe" data-page-link="anprobe"><span data-icon="ruler"></span>Anprobe</a>
+        <a href="#ratgeber" data-page-link="ratgeber"><span data-icon="book"></span>Ratgeber</a>
+      </nav>
+      <a class="settings-link" href="#einstellungen" data-page-link="einstellungen" aria-label="Profile und Datensicherung" title="Profile und Datensicherung"><span data-icon="settings"></span></a>
+    </div>
+  </header>
+  <main id="main" class="shell" tabindex="-1">
+    <div id="storage-warning" class="banner" role="alert" hidden></div>
+    <div id="update-banner" class="banner update-banner" hidden>
+      <span id="update-message" role="status">Ein Update für Kleiderstudio ist verfügbar.</span>
+      <button type="button" class="button subtle" data-action="update-app">Update laden</button>
+    </div>
+    <section class="view" id="view-studio" aria-labelledby="title-studio">
+      <div class="page-intro">
+        <div><h1 id="title-studio">Dein Ankleidestudio<span>.</span></h1>
+          <p>Probiere neue Kombinationen mit den Teilen aus deinem Schrank.</p></div>
+        <div class="intro-actions" data-profile-area>
+          <div class="profile-picker" id="profile-picker" role="group" aria-label="Aktives Profil"></div>
+        </div>
+      </div>
+      <div class="workspace">
+        <section class="panel figure-panel" id="figure-panel" aria-labelledby="figure-title">
+          <div class="panel-heading">
+            <div><h2 id="figure-title">Deine Figur</h2><p id="figure-caption"></p></div>
+            <div class="heading-actions">
+              <button class="icon-button" type="button" data-action="edit-profile" title="Figur konfigurieren" aria-label="Figur konfigurieren"><span data-icon="edit"></span></button>
+              <button class="icon-button" type="button" data-action="reset" title="Outfit zurücksetzen" aria-label="Outfit zurücksetzen"><span data-icon="reset"></span></button>
+            </div>
+          </div>
+          <div class="stage">
+            <div class="stage-grid" aria-hidden="true"></div>
+            <canvas id="avatar" width="480" height="600" role="img" aria-label="Figur mit aktuellem Outfit"></canvas>
+            <div class="stage-colors" id="stage-colors" aria-hidden="true"></div>
+          </div>
+          <button class="weather-control" type="button" data-action="edit-weather">
+            <span class="weather-symbol" data-icon="cloud"></span>
+            <span><strong id="weather-summary">Wetter eingeben</strong><small id="weather-caption">Für passende Look-Vorschläge</small></span>
+            <span data-icon="edit"></span>
+          </button>
+          <div class="outfit-slots" id="outfit-slots" aria-label="Angezogene Teile"></div>
+          <div class="outfit-slots accessory-slots" id="accessory-slots" aria-label="Angezogene Accessoires" hidden></div>
+          <div class="figure-actions">
+            <button class="button primary" type="button" data-action="save-look"><span data-icon="bookmark"></span>Look speichern</button>
+            <button class="button" type="button" data-action="suggest"><span data-icon="sparkles"></span><span id="suggest-label">Look vorschlagen</span></button>
+          </div>
+          <div class="figure-utils">
+            <button class="text-button" id="undo-outfit" type="button" data-action="undo-outfit" aria-label="Letzte Outfit-Änderung rückgängig machen" hidden><span data-icon="reset"></span>Rückgängig</button>
+            <button class="text-button wardrobe-jump" type="button" data-action="show-wardrobe"><span data-icon="hanger"></span>Teile wählen</button>
+          </div>
+        </section>
+        <section class="panel wardrobe-panel" aria-labelledby="wardrobe-title">
+          <div class="panel-heading wardrobe-heading">
+            <div><h2 id="wardrobe-title" tabindex="-1">Kleiderschrank</h2><p id="closet-caption">Tippe auf ein Teil, um es anzuprobieren.</p></div>
+            <div class="capture-actions">
+              <button class="button subtle" type="button" data-action="new-photo"><span data-icon="camera"></span>Aus Foto</button>
+              <button class="button add-button" type="button" data-action="new-item"><span data-icon="plus"></span>Teil hinzufügen</button>
+            </div>
+          </div>
+          <div class="categories" id="studio-categories" role="group" aria-label="Kleidungskategorie"></div>
+          <div class="studio-tools">
+            <div class="style-select"><span data-icon="sliders"></span><select id="target-style" aria-label="Gewünschter Stil"></select></div>
+            <label class="switch-line"><input type="checkbox" id="match-only"><span class="switch-track"></span><span>Nur passende</span></label>
+          </div>
+          <label class="search studio-search"><span data-icon="search"></span><input id="studio-search" type="search" autocomplete="off" maxlength="100" placeholder="In dieser Kategorie suchen …" aria-label="In dieser Kategorie suchen"></label>
+          <div class="garment-grid" id="studio-items"></div>
+          <p class="filter-note" id="filter-note" role="status" hidden></p>
+          <div class="tip" id="style-tip"></div>
+          <div class="tip" id="weather-tip" hidden><span class="tip-icon" data-icon="cloud"></span><div><strong>Wetter-Tipp</strong><p id="weather-advice"></p></div></div>
+        </section>
+      </div>
+      <button class="button mobile-preview" type="button" data-action="show-figure" hidden><span data-icon="user"></span>Figur ansehen</button>
+    </section>
+    <section class="view" id="view-schrank" aria-labelledby="title-schrank" hidden>
+      <div class="page-intro">
+        <div><h1 id="title-schrank">Dein Kleiderschrank<span>.</span></h1><p id="catalog-caption"></p></div>
+        <div class="intro-actions" data-profile-area>
+          <div class="capture-actions">
+            <button class="button subtle" type="button" data-action="new-photo"><span data-icon="camera"></span>Aus Foto</button>
+            <button class="button primary" type="button" data-action="new-item"><span data-icon="plus"></span>Teil hinzufügen</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel catalog-panel">
+        <div class="catalog-tools">
+          <label class="search"><span data-icon="search"></span><input id="catalog-search" type="search" autocomplete="off" maxlength="100" placeholder="Teile suchen …" aria-label="Teile suchen"></label>
+          <select id="catalog-category" aria-label="Kategorie filtern"></select>
+        </div>
+        <p class="filter-note catalog-summary" id="catalog-results" role="status" hidden></p>
+        <div class="garment-grid catalog-grid" id="catalog-items"></div>
+      </div>
+    </section>
+    <section class="view" id="view-looks" aria-labelledby="title-looks" hidden>
+      <div class="page-intro"><div><h1 id="title-looks">Gespeicherte Looks<span>.</span></h1><p id="looks-caption"></p></div><div class="intro-actions" data-profile-area></div></div>
+      <div id="saved-looks" class="look-grid"></div>
+    </section>
+    <section class="view" id="view-anprobe" aria-labelledby="title-anprobe" hidden>
+      <div class="page-intro"><div><h1 id="title-anprobe">Virtuelle Anprobe<span>.</span></h1><p>Probiere ein neues Teil an deinem aktuellen Outfit aus und vergleiche seine Maße.</p></div><div class="intro-actions" data-profile-area></div></div>
+      <div class="workspace">
+        <section class="panel figure-panel" id="fit-preview-panel" aria-labelledby="fit-preview-title">
+          <div class="panel-heading">
+            <div><h2 id="fit-preview-title">Vorschau</h2><p id="fit-person"></p></div>
+            <button type="button" class="button" data-action="edit-measures"><span data-icon="ruler"></span>Körpermaße</button>
+          </div>
+          <div class="stage fit-stage"><div class="stage-grid" aria-hidden="true"></div><canvas id="fit-avatar" width="480" height="600" role="img" aria-label="Vorschau auf der Figur"></canvas></div>
+          <p class="fit-note">Die Zeichnung zeigt Schnitt, Farben und Schichten vereinfacht. Der Maßvergleich hilft dir, die Größe einzuschätzen.</p>
+          <button type="button" class="text-button wardrobe-jump" data-action="show-fitting-form"><span data-icon="ruler"></span>Fundstück auswählen</button>
+        </section>
+        <section class="panel fitting-panel" aria-labelledby="fit-form-title">
+          <div class="panel-heading"><div><h2 id="fit-form-title" tabindex="-1">Fundstück anprobieren</h2><p>Wähle den Schnitt des Kleidungsstücks.</p></div></div>
+          <form id="fit-form">
+            <div class="fields-pair">
+              <label class="field"><span>Kategorie</span><select id="fit-category"></select></label>
+              <label class="field"><span>Schnitt</span><select id="fit-cut"></select></label>
+              <label class="field"><span>Grundfarbe</span><select id="fit-color"></select></label>
+              <label class="field"><span>Passform</span><select id="fit-ease"></select></label>
+            </div>
+            <label class="field" id="fit-custom-row" hidden><span>Eigener Farbton</span><input type="color" id="fit-custom-color" value="#692a41"></label>
+            <div class="fitting-section">
+              <h3>Screenshot oder Foto</h3>
+              <p>Tippe ins Bild oder nutze die Regler, um den Stoffausschnitt zu wählen. Das Bild bleibt bis zum Neuladen im Browser-Tab.</p>
+              <input type="file" id="fit-file" class="fit-file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" aria-label="Referenzbild auswählen">
+              <p class="form-error" id="fit-error" role="alert" hidden></p>
+              <div id="fit-crop" class="crop-grid" hidden>
+                <canvas id="fit-reference" width="300" height="225" role="img" aria-label="Referenzbild mit aktuellem Stoffausschnitt"></canvas>
+                <div>
+                  <label class="crop-control">Links / rechts<input type="range" id="fit-x" min="0" max="100" value="50"></label>
+                  <label class="crop-control">Oben / unten<input type="range" id="fit-y" min="0" max="100" value="50"></label>
+                  <label class="crop-control">Ausschnittgröße<input type="range" id="fit-size" min="6" max="75" value="28"></label>
+                  <button type="button" class="button" id="fit-remove">Bild entfernen</button>
+                </div>
+              </div>
+              <div id="fit-texture-options" hidden>
+                <label class="switch-line"><input type="checkbox" id="fit-use-texture" checked><span class="switch-track"></span><span>Bildmuster verwenden</span></label>
+                <p id="fit-texture-status" role="status"></p>
+              </div>
+            </div>
+            <div class="fitting-section">
+              <h3>Maße des Kleidungsstücks</h3>
+              <p id="fit-measure-hint"></p>
+              <label class="field" id="fit-mode-label"><span>Angaben im Shop</span><select id="fit-mode"><option value="around">Umfang (ganze Runde)</option><option value="flat">Breite (flach gemessen)</option></select></label>
+              <div class="measure-fields" id="fit-measure-fields"></div>
+              <div id="fit-results" aria-live="polite"></div>
+            </div>
+            <div class="heading-actions fit-actions">
+              <button type="button" class="button primary" data-action="save-fitting"><span data-icon="plus"></span>Schnitt und Farbe übernehmen</button>
+            </div>
+          </form>
+        </section>
+      </div>
+      <button type="button" class="button mobile-preview" data-action="show-fitting" hidden><span data-icon="user"></span>Vorschau ansehen</button>
+    </section>
+    <section class="view" id="view-ratgeber" aria-labelledby="title-ratgeber" hidden>
+      <div class="page-intro"><div><h1 id="title-ratgeber">Stilratgeber<span>.</span></h1><p>Ideen für Farben, Schichten und Anlässe.</p></div></div>
+      <div class="guide-grid">
+        <article class="panel info-card"><span class="info-icon" data-icon="palette"></span><h2>Farben kombinieren</h2><p>Beginne mit einem farbigen Teil und ergänze neutrale Töne. Ein gelbes Shirt wirkt mit schwarzer Hose ruhig. Creme kann denselben Look heller und weicher machen.</p><div class="examples"><span class="swatch" style="--swatch:#e7be59"></span><span class="swatch" style="--swatch:#30343a"></span><span class="swatch" style="--swatch:#e9e1cf"></span></div></article>
+        <article class="panel info-card"><span class="info-icon" data-icon="layers"></span><h2>Schichten aufbauen</h2><p>Wähle unter „Oberteile“ ein Hemd oder eine Bluse. Unter „Pullover“ kannst du eine zweite Schicht anziehen, unter „Jacken“ eine dritte. Über dickem Strick oder einem weiten Rock hilft eine großzügig geschnittene Jacke.</p></article>
+        <article class="panel info-card"><span class="info-icon" data-icon="sparkles"></span><h2>Für den Anlass wählen</h2><p>Für Casual passen zum Beispiel T-Shirt, Jeans und Sneaker. Für Smart Casual probiere ein Hemd mit schlichter Hose und Lederschuhen. Die Stilwahl im Studio priorisiert entsprechend markierte Teile.</p></article>
+        <article class="panel info-card"><span class="info-icon" data-icon="sliders"></span><h2>Empfehlungen nutzen</h2><p>Das Studio bewertet deine Auswahl nach Farbgruppen, Stil und Schichten. „Nur passende“ blendet schwächere Vorschläge aus. Schalte den Filter aus, wenn du frei kombinieren möchtest.</p></article>
+      </div>
+    </section>
+    <section class="view" id="view-einstellungen" aria-labelledby="title-einstellungen" hidden>
+      <div class="page-intro"><div><h1 id="title-einstellungen">Profile &amp; Daten<span>.</span></h1><p>Verwalte eure Figuren und sichere beide Kleiderschränke.</p></div></div>
+      <div class="guide-grid">
+        <section class="panel info-card"><span class="info-icon" data-icon="user"></span><h2>Personen</h2><div id="settings-profiles"></div></section>
+        <section class="panel info-card"><span class="info-icon" data-icon="download"></span><h2>Datensicherung</h2><p>Änderungen werden in diesem Browser gespeichert. Mit einer JSON-Sicherung kannst du beide Profile auf ein anderes Gerät übertragen oder später wiederherstellen.</p>
+          <div class="backup-actions">
+            <button class="button primary" data-action="export"><span data-icon="download"></span>JSON exportieren</button>
+            <button class="button" data-action="import"><span data-icon="upload"></span>JSON importieren</button>
+            <button class="button" id="export-raw" data-action="export-raw" hidden>Beschädigte Browserdaten sichern</button>
+            <input type="file" id="import-file" accept=".json,application/json" hidden>
+          </div>
+          <p id="import-feedback" role="status" hidden></p>
+        </section>
+        <section class="panel info-card"><span class="info-icon" data-icon="device"></span><h2>Offline und Startbildschirm</h2><p id="offline-status" role="status"></p><p>Öffne die HTTPS-Adresse auf dem Handy und wähle im Browser „App installieren“ oder „Zum Home-Bildschirm“, sofern der Browser diese Option anbietet.</p><button type="button" class="button" id="install-button" data-action="install" hidden>App installieren</button></section>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer"><span data-icon="hanger"></span><span>Kleiderstudio</span><span class="footer-divider"></span><span id="save-status">Auf diesem Gerät gespeichert</span></footer>
+  <dialog id="editor" aria-labelledby="editor-title">
+    <form id="editor-form" novalidate>
+      <div class="modal-heading"><h2 id="editor-title"></h2><button type="button" class="icon-button" data-action="close-dialog" aria-label="Schließen"><span data-icon="close"></span></button></div>
+      <div id="editor-fields"></div>
+      <p id="editor-error" class="form-error" role="alert" hidden></p>
+      <div class="modal-actions"><button type="button" class="button" data-action="close-dialog">Abbrechen</button><button type="submit" class="button primary" id="editor-submit">Speichern</button></div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <noscript><p class="banner">Aktiviere JavaScript, um das Kleiderstudio zu verwenden.</p></noscript>
+</body>
+</html>
