@@ -39,7 +39,7 @@ Körpermaße ändern, Beispielteile entfernen und beide Profile als JSON sichern
 jeweilige Adresse. Für den Wechsel von der Datei-Adresse zu GitHub Pages,
 einen Browserwechsel oder ein zweites Handy exportiere und importiere die
 Sicherung. Der bestätigte Import ersetzt beide Profile.
-Sicherungen der Versionen 1 bis 3 sind weiterhin lesbar. Alte Pullover werden
+Sicherungen der Versionen 1 bis 4 sind weiterhin lesbar. Alte Pullover werden
 dabei in die neue Zwischenschicht einsortiert, auch in gespeicherten Looks.
 Vor einem Import kannst du die bisherigen Daten aus dem Bestätigungsdialog
 herunterladen.
@@ -51,9 +51,23 @@ Kette kombinieren und im selben Look speichern. Verwende beim Erfassen die
 Passform, Grundfarbe und optional eine zweite Farbe für das Muster.
 Bei Schuhen stellst du unter „Sohlenfarbe“ die Sohle unabhängig vom Obermaterial
 ein. Die gezeichnete Vorschau und die Figur zeigen beide Farben.
-Im Studio durchsucht das Suchfeld die gewählte Kategorie. Der Vorschlag
-ergänzt freie Plätze zuerst. „Rückgängig“ stellt das Outfit vor der letzten
-Outfit-Änderung in diesem Tab wieder her.
+Im Studio durchsucht das Suchfeld die gewählte Kategorie. „Rückgängig“
+stellt das Outfit vor der letzten Outfit-Änderung in diesem Tab wieder her.
+
+ANLASS, DRESSCODE UND LOOK BESTÄTIGEN
+Wähle oben bei der Figur einen Anlass wie Office, Strand, Gala, Tagung,
+Dinner oder Hochzeit. Der Dresscode wird dafür automatisch vorgeschlagen.
+Du kannst ihn ändern und bei Bedarf das Wetter ergänzen. „Look vorschlagen“
+kombiniert die vorhandenen Teile nach Anlass, Dresscode, Farben und Wetter.
+„Neuer Look“ bevorzugt noch nicht gezeigte Kombinationen. Wenn die passenden
+Varianten aufgebraucht sind, kann ein früherer Vorschlag wieder erscheinen.
+Der Verlauf der letzten 36 Vorschläge und die Einstellungen bleiben pro
+Profil gespeichert. Über „Teile fixieren“ behältst du bestimmte angezogene
+Teile bei weiteren Vorschlägen.
+„Look bestätigen“ öffnet die Übersicht mit den tatsächlich angezogenen
+Kleidungsstücken, Schuhen und Accessoires. Das gilt auch für manuell
+zusammengestellte Looks. Aus der Übersicht kannst du den Look in „Looks“
+speichern und später mit seinem Anlass und Dresscode wieder anziehen.
 
 KLEIDUNG AUS FOTOS ERFASSEN
 Wähle im Studio oder im Schrank „Aus Foto“. Fotografiere ein einzelnes Teil
@@ -76,7 +90,7 @@ Material, Maße und Wetterschutz sind manuell.
 WETTER IM STUDIO
 Unter der Figur kannst du Temperatur, Himmel, Niederschlag und Wind manuell
 eintragen. Die Angaben gelten für das aktive Profil und bleiben gespeichert.
-„Wetter-Look vorschlagen“ ergänzt passende Schichten und kann deutlich
+„Look vorschlagen“ ergänzt passend zum Wetter Schichten und kann deutlich
 unpassende Teile austauschen. Unter „Teil hinzufügen“ bzw. beim Bearbeiten
 kannst du Wärme und Wetterschutz angeben. Bei Regen werden als wasserabweisend
 markierte Jacken und Schuhe bevorzugt. Die App lädt keine Wetterdaten.
@@ -98,6 +112,7 @@ ERWEITERN
 index.html und style.css enthalten Oberfläche und Layout. data.js verwaltet
 Kategorien, Schnitte, Farben, Beispieldaten, Stile und Bewertungsregeln.
 weather.js bewertet Wärme und Wetterschutz für die manuell erfasste Lage.
+look-planner.js kombiniert Anlass, Dresscode, Wetter und Vorschlagsverlauf.
 drawing.js zeichnet Figuren und Kleidungsstücke mit Canvas. fitting.js
 steuert die virtuelle Anprobe und den Maßvergleich. reference-image.js
 prüft und verkleinert lokale Bilder. photo-recognition.js wertet Kleidungsfotos

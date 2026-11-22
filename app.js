@@ -33,6 +33,7 @@
     download: "M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4",
     upload: "M12 15V3m-4 4 4-4 4 4M4 16v4h16v-4",
     camera: "M3 7h4l2-3h6l2 3h4v13H3zM16 13a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z",
+    lock: "M5 10h14v10H5zM8 10V7a4 4 0 1 1 8 0v3m-4 4v2",
     device: "M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm3 17h2",
     cloud: "M7 18a4.5 4.5 0 1 1-.55-8.96A5.5 5.5 0 0 1 17 9.5a4.25 4.25 0 0 1 0 8.5H7Zm-3-14v2m-2 0 2 2m5-5-1 2",
     close: "m6 6 12 12M18 6 6 18"
@@ -66,6 +67,7 @@
   let visibleProfileId;
   let profileMarkup;
   const outfitUndo = new Map();
+  const suggestionNotes = new Map();
   const previewObservers = new Map();
   const storageConflict = "Die Daten wurden in einem anderen Tab geändert. Starte diese Aktion erneut.";
   let offlineText = location.protocol === "file:" ? "Die lokalen App-Dateien lassen sich offline öffnen." : "Offline-Speicher wird vorbereitet.";
@@ -180,19 +182,26 @@
     return true;
   }
 
-  async function setOutfit(pieces, message, focusBack, undo = false) {
+  async function setOutfit(pieces, message, focusBack, { undo = false, context, suggestion } = {}) {
     const profile = current();
-    const previous = profile.pieces;
-    const error = await commit((draft) => { current(draft).pieces = pieces; });
+    const previous = { pieces: profile.pieces, context: context ? LookPlanner.context(profile.plan) : undefined };
+    const error = await commit((draft) => {
+      const next = current(draft);
+      next.pieces = pieces;
+      if (context) Object.assign(next.plan, context);
+      if (suggestion) next.plan.recent = LookPlanner.remember(next.plan, pieces);
+    });
     if (error) {
       announce(error);
       return false;
     }
     if (undo) outfitUndo.delete(profile.id);
     else outfitUndo.set(profile.id, previous);
+    suggestionNotes.delete(profile.id);
+    if (suggestion?.note) suggestionNotes.set(profile.id, suggestion.note);
     render();
     focusBack?.()?.focus({ preventScroll: true });
-    announce(message);
+    if (message) announce(message);
     return true;
   }
 
@@ -226,14 +235,18 @@
     AtelierArt.figure($("avatar"), worn, profile);
     $("stage-colors").innerHTML = [...new Set(equipped.flatMap((item) =>
       [W.itemColor(item).hex, item.pattern !== "solid" ? item.accent : null, item.soleColor].filter(Boolean)))].slice(0, 8).map(swatch).join("");
-    const slotMarkup = (key) => '<button type="button" class="slot' + (worn[key] ? " filled" : "") +
-      '" data-action="slot" data-id="' + key + '" aria-label="' + esc(worn[key] ? worn[key].name + " ausziehen" : W.slots[key].short + " auswählen") +
-      '" title="' + esc(worn[key] ? worn[key].name + " ausziehen" : W.slots[key].short + " auswählen") + '">' +
-      icon(worn[key] ? "check" : W.slots[key].icon) + W.slots[key].short + "</button>";
+    const fixed = new Set(profile.plan.fixed);
+    const slotMarkup = (key) => {
+      const locked = fixed.has(worn[key]?.id);
+      const label = worn[key] ? worn[key].name + " ausziehen" + (locked ? " (für Vorschläge fixiert)" : "") : W.slots[key].short + " auswählen";
+      return '<button type="button" class="slot' + (worn[key] ? " filled" : "") +
+        '" data-action="slot" data-id="' + key + '" aria-label="' + esc(label) + '" title="' + esc(label) + '">' +
+        icon(locked ? "lock" : worn[key] ? "check" : W.slots[key].icon) + W.slots[key].short + "</button>";
+    };
     $("outfit-slots").innerHTML = W.mainKeys.map(slotMarkup).join("");
     $("accessory-slots").hidden = category !== "accessories";
     if (category === "accessories") $("accessory-slots").innerHTML = W.accessoryKeys.map(slotMarkup).join("");
-    document.querySelector('[data-action="save-look"]').disabled = equipped.length === 0;
+    document.querySelector('[data-action="review-look"]').disabled = equipped.length === 0;
     document.querySelector('[data-action="reset"]').disabled = equipped.length === 0;
     document.querySelector('[data-action="suggest"]').disabled = !profile.items.some((item) => W.mainKeys.includes(item.category));
     const weather = Weather.summary(profile.weather);
@@ -242,7 +255,14 @@
     const weatherButton = document.querySelector('[data-action="edit-weather"]');
     weatherButton.classList.toggle("has-weather", Boolean(weather));
     weatherButton.setAttribute("aria-label", weather ? "Wetter bearbeiten: " + weather : "Wetter eingeben");
-    $("suggest-label").textContent = weather ? "Wetter-Look vorschlagen" : "Look vorschlagen";
+    $("look-occasion").value = profile.plan.occasion;
+    $("look-dresscode").value = profile.plan.dressCode;
+    const dress = LookPlanner.dress(profile.plan);
+    showText("look-auto-dress", profile.plan.dressCode === "auto" && dress !== "auto" ? "Vorschläge für " + W.dressCodes[dress] : "");
+    $("suggest-label").textContent = LookPlanner.hasHistory(profile.plan) ? "Neuer Look" : "Look vorschlagen";
+    showText("look-feedback", suggestionNotes.get(profile.id) || "");
+    $("fix-pieces").hidden = !W.mainKeys.some((key) => worn[key]);
+    $("fixed-label").textContent = fixed.size ? countLabel(fixed.size, "Teil fixiert", "Teile fixiert") : "Teile fixieren";
     $("weather-tip").hidden = !weather;
     $("weather-advice").textContent = Weather.advice(profile.weather, worn);
     $("undo-outfit").hidden = !outfitUndo.has(profile.id);
@@ -381,8 +401,10 @@
     grid.innerHTML = profile.looks.map((look) => {
       const worn = W.outfit(profile, look.pieces, items);
       const names = Object.values(worn).filter(Boolean).map((item) => item.name).join(" · ");
+      const context = look.context ? LookPlanner.contextTitle(look.context) : "";
       return '<article class="panel look-card"><div class="look-art"><canvas width="1" height="1" data-look="' + look.id +
-        '" aria-hidden="true"></canvas></div><h3>' + esc(look.name) + '</h3><p class="look-details">' + esc(names) +
+        '" aria-hidden="true"></canvas></div><h3>' + esc(look.name) + "</h3>" +
+        (context ? '<p class="saved-look-context">' + esc(context) + "</p>" : "") + '<p class="look-details">' + esc(names) +
         '</p><div class="look-actions"><button class="button primary" type="button" data-action="load-look" data-id="' + look.id + '">' +
         icon("shirt") + 'Anziehen</button><button class="icon-button" type="button" data-action="rename-look" data-id="' + look.id +
         '" aria-label="' + esc(look.name + " umbenennen") + '">' + icon("edit") +
@@ -463,7 +485,7 @@
     return () => document.querySelector('[data-action="' + action + '"][data-id="' + id + '"]');
   }
 
-  function openEditor({ title, fields, submit = "Speichern", danger = false, photoMode = false, run }) {
+  function openEditor({ title, fields, submit = "Speichern", danger = false, photoMode = false, summary = false, run }) {
     editor = run;
     const replacing = dialog.open;
     if (!replacing) {
@@ -471,10 +493,14 @@
       editorOrigin = { opener, page, action: opener?.dataset.action, id: opener?.dataset.id };
     }
     dialog.classList.toggle("photo-mode", photoMode);
+    dialog.classList.toggle("summary-mode", summary);
     $("editor-title").textContent = title;
     $("editor-fields").oninput = null;
     $("editor-fields").onchange = null;
+    releasePreviews($("editor-fields"));
     $("editor-fields").innerHTML = fields;
+    $("editor-cancel").textContent = summary ? "Fertig" : "Abbrechen";
+    $("summary-save").hidden = !summary;
     $("editor-submit").textContent = submit || "";
     $("editor-submit").hidden = !submit;
     $("editor-submit").className = "button " + (danger ? "danger" : "primary");
@@ -482,7 +508,8 @@
     $("editor-error").hidden = true;
     if (!replacing) dialog.showModal();
     dialog.scrollTop = 0;
-    (dialog.querySelector("[data-first]") || dialog.querySelector('[data-action="close-dialog"]')).focus({ preventScroll: true });
+    const focus = summary ? $("editor-title") : dialog.querySelector("[data-first]") || dialog.querySelector('[data-action="close-dialog"]');
+    focus.focus({ preventScroll: true });
   }
 
   function confirm(title, body, submit, change, message, options = {}) {
@@ -494,6 +521,7 @@
       const error = await commit(change, options);
       if (!error) {
         outfitUndo.clear();
+        suggestionNotes.clear();
         if (options.recovery) FittingRoom.resetDrafts();
         render();
         announce(message);
@@ -797,6 +825,7 @@
         const next = { temperature, sky: form.get("sky"), precipitation: form.get("precipitation"), wind: form.get("wind") };
         const error = await commit((draft) => { current(draft).weather = next; });
         if (!error) {
+          suggestionNotes.delete(person.id);
           render();
           announce(Weather.known(next) ? "Wetter für Vorschläge gespeichert." : "Wetter für Vorschläge entfernt.");
         }
@@ -805,15 +834,62 @@
     });
   }
 
+  function reviewLook(profile) {
+    const clothes = Object.values(W.outfit(profile)).filter(Boolean);
+    if (!clothes.length) return;
+    const context = LookPlanner.contextTitle(profile.plan);
+    const weather = Weather.summary(profile.weather);
+    const count = countLabel(clothes.length, "Teil", "Teile");
+    const items = clothes.map((item) => {
+      const color = W.itemColor(item);
+      return '<li>' + garmentArt(item) + '<div class="summary-piece"><small>' + W.slots[item.category].short +
+        '</small><strong>' + esc(item.name) + '</strong><span class="summary-color">' + swatch(color.hex) +
+        (item.pattern !== "solid" ? swatch(item.accent) : "") + (item.soleColor ? swatch(item.soleColor) : "") +
+        esc(color.name) + (item.pattern !== "solid" ? " · " + W.patterns[item.pattern] : "") + "</span></div></li>";
+    }).join("");
+    openEditor({
+      title: "Dein fertiger Look", summary: true, submit: null,
+      fields: '<p class="summary-context">' + esc([context, count].filter(Boolean).join(" · ")) + "</p>" +
+        (weather ? '<p class="summary-weather">' + icon("cloud") + "<span>" + esc(weather) + "</span></p>" : "") +
+        '<ul class="summary-items" role="list">' + items + "</ul>"
+    });
+    drawGarments($("editor-fields"), profile);
+  }
+
+  function fixPieces(profile) {
+    const worn = W.outfit(profile);
+    const pieces = W.mainKeys.map((key) => worn[key]).filter(Boolean);
+    if (!pieces.length) return;
+    const choices = pieces.map((item, index) =>
+      '<label class="fix-choice"><input type="checkbox" name="fixed" value="' + item.id + '"' +
+      (index === 0 ? " data-first" : "") + (profile.plan.fixed.includes(item.id) ? " checked" : "") +
+      '><span><small>' + W.slots[item.category].short + "</small><strong>" + esc(item.name) + "</strong></span></label>").join("");
+    openEditor({
+      title: "Teile fixieren", submit: "Übernehmen",
+      fields: "<p>Fixierte Teile bleiben beim nächsten Vorschlag angezogen.</p>" + '<div class="fix-list">' + choices + "</div>",
+      async run(form) {
+        const error = await commit((draft) => { current(draft).plan.fixed = form.getAll("fixed"); });
+        if (!error) {
+          suggestionNotes.delete(profile.id);
+          render();
+        }
+        return error;
+      }
+    });
+  }
+
   function lookEditor(look) {
-    if (!look && current().looks.length >= W.MAX_LOOKS) return announce("Für dieses Profil sind bereits 300 Looks gespeichert.");
-    openEditor({ title: look ? "Look umbenennen" : "Look speichern", fields: field("Name des Looks", input("name", look?.name || "", 48)), async run(form) {
+    const profile = current();
+    if (!look && profile.looks.length >= W.MAX_LOOKS) return announce("Für dieses Profil sind bereits 300 Looks gespeichert.");
+    const suggestedName = profile.plan.occasion === "any" ? "" : W.occasions[profile.plan.occasion] + "-Look";
+    openEditor({ title: look ? "Look umbenennen" : "Look speichern", fields: field("Name des Looks", input("name", look?.name ?? suggestedName, 48)), async run(form) {
       const name = form.get("name");
       if (!W.nameValue(name, 48)) return "Gib deinem Look einen Namen mit 1 bis 48 Zeichen.";
       const error = await commit((draft) => {
         const profile = current(draft);
         if (look) profile.looks.find((entry) => entry.id === look.id).name = name.trim();
-        else profile.looks.unshift({ id: W.newId(), name: name.trim(), pieces: { ...profile.pieces } });
+        else profile.looks.unshift({ id: W.newId(), name: name.trim(), pieces: { ...profile.pieces },
+          context: LookPlanner.context(profile.plan) });
       });
       if (!error) {
         render();
@@ -824,13 +900,19 @@
   }
 
   async function suggest() {
+    if (saving) return;
     const profile = current();
-    const result = W.suggestOutfit(profile);
-    if (!result) return announce("Für diese Kombination gibt es gerade keinen weiteren passenden Vorschlag.");
-    const message = Weather.known(profile.weather) ? "Wetter-Look angezogen." : result.added
-      ? "Look um " + countLabel(result.added, "Teil", "Teile") + " ergänzt."
-      : "Alternative angezogen: " + result.alternative + ".";
-    await setOutfit(result.pieces, message);
+    const result = LookPlanner.suggest(profile);
+    if (!result) {
+      const message = profile.plan.fixed.length
+        ? "Mit den fixierten Teilen gibt es gerade keine weitere passende Kombination."
+        : "Für diese Auswahl gibt es gerade keine weitere passende Kombination.";
+      suggestionNotes.set(profile.id, message);
+      showText("look-feedback", message);
+      return;
+    }
+    const message = result.added ? "Look um " + countLabel(result.added, "Teil", "Teile") + " ergänzt." : "Neuer Vorschlag angezogen.";
+    await setOutfit(result.pieces, message, undefined, { suggestion: result });
   }
 
   function download(contents, prefix, type, extension) {
@@ -880,7 +962,7 @@
     const attached = itemsWithPhotos(incoming);
     if (raw.photos === undefined && !attached.length) return [];
     const message = "Die Sicherung enthält ungültige oder fehlende Kleidungsfotos.";
-    if (raw.version !== 4 || !raw.photos || typeof raw.photos !== "object" || Array.isArray(raw.photos) ||
+    if (raw.version < 4 || !raw.photos || typeof raw.photos !== "object" || Array.isArray(raw.photos) ||
       Object.keys(raw.photos).length !== attached.length) throw new Error(message);
     const files = attached.map((item) => Object.hasOwn(raw.photos, item.photo) ? raw.photos[item.photo] : null);
     if (!files.every(GarmentPhotos.validThumbnail)) throw new Error(message);
@@ -999,6 +1081,16 @@
   document.querySelectorAll("[data-icon]").forEach((node) => { node.innerHTML = icon(node.dataset.icon); });
   $("catalog-category").innerHTML = options({ all: "Alle Kategorien", ...categoryNames }, "all");
   $("target-style").innerHTML = options({ any: "Alle Stile", ...W.styles }, "any");
+  for (const [id, key, choices] of [["look-occasion", "occasion", W.occasions], ["look-dresscode", "dressCode", W.dressCodes]]) {
+    const control = $(id);
+    control.innerHTML = options(choices, current().plan[key]);
+    control.addEventListener("change", async () => {
+      const value = control.value;
+      if (!Object.hasOwn(choices, value)) return;
+      suggestionNotes.delete(current().id);
+      if (!await update((draft) => { current(draft).plan[key] = value; })) control.value = current().plan[key];
+    });
+  }
   $("catalog-search").addEventListener("input", renderCatalog);
   $("catalog-category").addEventListener("change", renderCatalog);
   $("studio-search").addEventListener("input", () => renderStudioItems(current()));
@@ -1036,6 +1128,7 @@
     if (editorBusy) event.preventDefault();
   });
   dialog.addEventListener("close", () => {
+    releasePreviews($("editor-fields"));
     const origin = editorOrigin;
     editor = null;
     editorOrigin = null;
@@ -1071,6 +1164,7 @@
     }
     readStorage();
     outfitUndo.clear();
+    suggestionNotes.clear();
     render();
   });
 
@@ -1135,11 +1229,14 @@
         break;
       case "undo-outfit": {
         const previous = outfitUndo.get(profile.id);
-        if (previous) await setOutfit(W.piecesOf(W.outfit(profile, previous)), "Letzte Outfit-Änderung rückgängig gemacht.",
-          () => document.querySelector('[data-action="reset"]:not(:disabled), [data-action="suggest"]:not(:disabled)'), true);
+        if (previous) await setOutfit(W.piecesOf(W.outfit(profile, previous.pieces)), "Letzte Outfit-Änderung rückgängig gemacht.",
+          () => document.querySelector('[data-action="reset"]:not(:disabled), [data-action="suggest"]:not(:disabled)'),
+          { undo: true, context: previous.context });
         break;
       }
-      case "suggest": suggest(); break;
+      case "suggest": await suggest(); break;
+      case "review-look": reviewLook(profile); break;
+      case "fix-pieces": fixPieces(profile); break;
       case "new-item": itemEditor(); break;
       case "new-photo": photoEditor(); break;
       case "pick-photo": $("garment-file")?.click(); break;
@@ -1169,7 +1266,7 @@
       case "save-look": lookEditor(); break;
       case "rename-look": lookEditor(look); break;
       case "load-look":
-        if (await setOutfit({ ...look.pieces }, "„" + look.name + "“ angezogen.")) location.hash = "studio";
+        if (await setOutfit({ ...look.pieces }, "„" + look.name + "“ angezogen.", undefined, { context: look.context })) location.hash = "studio";
         break;
       case "delete-look":
         confirm("Look löschen?", "„" + look.name + "“ wird aus deinen gespeicherten Looks entfernt.", "Löschen",
@@ -1179,6 +1276,7 @@
       case "edit-measures": measureEditor(person || profile); break;
       case "edit-weather": weatherEditor(profile); break;
       case "clear-weather":
+        suggestionNotes.delete(profile.id);
         if (!editorBusy && await update((draft) => { current(draft).weather = Weather.empty(); }, "Wetter für Vorschläge entfernt.")) dialog.close();
         break;
       case "save-fitting": itemEditor(null, FittingRoom.garment()); break;

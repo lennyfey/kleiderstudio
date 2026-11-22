@@ -14,6 +14,10 @@ const Wardrobe = (() => {
   };
 
   const styles = { casual: "Casual", smart: "Smart Casual", formal: "Elegant", sport: "Sportlich" };
+  const occasions = { any: "Ohne Anlass", office: "Office", beach: "Strand", gala: "Gala", conference: "Tagung",
+    dinner: "Dinner", wedding: "Hochzeit", everyday: "Freizeit", trip: "Reise", outdoor: "Outdoor", sport: "Sport" };
+  const dressCodes = { auto: "Automatisch", casual: "Casual", smart: "Smart Casual", business: "Business Casual",
+    formal: "Business Formal", blackTie: "Black Tie", sport: "Sportlich" };
   const figures = { male: "Männlich", female: "Weiblich" };
   const haircuts = { short: "Kurzhaar", buzz: "Sehr kurz", curls: "Locken", afro: "Offener Afro", afroPuff: "Afro-Puff mit Locken",
     curlyPony: "Afro-Zopf mit langen Locken", ponytail: "Pferdeschwanz", long: "Langes Haar", bald: "Rasierter Kopf" };
@@ -118,10 +122,12 @@ const Wardrobe = (() => {
   const MAX_ITEMS = 300;
   const MAX_LOOKS = 300;
   const MAX_FILE = 12_000_000;
+  const MAX_RECENT_LOOKS = 36;
   const has = (obj, key) => typeof key === "string" && Object.hasOwn(obj, key);
   const styleName = (style) => styles[style] || "Alle Stile";
   const validHex = (value) => typeof value === "string" && /^#[\da-f]{6}$/i.test(value);
   const baseAvatar = (figure) => ({ hair: figure === "female" ? "long" : "short", skin: figure === "female" ? "#c59376" : "#bb8d73", hairColor: "#3d2d28" });
+  const basePlan = () => ({ occasion: "any", dressCode: "auto", fixed: [], recent: [] });
   function defaults() {
     const profiles = [samples, secondSamples].map((list, index) => {
       const id = "profil-" + (index + 1);
@@ -133,9 +139,9 @@ const Wardrobe = (() => {
       const pieces = { ...emptyPieces(), top: items[0].id, bottom: items[6].id };
       const figure = index === 0 ? "male" : "female";
       return { id, name: "Person " + (index + 1), figure, avatar: baseAvatar(figure), measures: {}, weather: Weather.empty(),
-        items, looks: [], pieces, style: "any", matchOnly: false };
+        items, looks: [], pieces, style: "any", matchOnly: false, plan: basePlan() };
     });
-    return { version: 4, active: profiles[0].id, profiles };
+    return { version: 5, active: profiles[0].id, profiles };
   }
 
   const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -153,9 +159,10 @@ const Wardrobe = (() => {
   }
 
   function validated(raw) {
-    check(object(raw) && [1, 2, 3, 4].includes(raw.version), "Die Datei hat kein unterstütztes Kleiderstudio-Format (Version 1 bis 4).");
+    check(object(raw) && [1, 2, 3, 4, 5].includes(raw.version), "Die Datei hat kein unterstütztes Kleiderstudio-Format (Version 1 bis 5).");
     const legacy = raw.version === 1;
     const beforeWeather = raw.version < 3;
+    const beforePlanning = raw.version < 5;
     check(Array.isArray(raw.profiles) && raw.profiles.length === 2, "Die Sicherung muss genau zwei Profile enthalten.");
     const seenProfiles = new Set();
     const seenPhotos = new Set();
@@ -181,7 +188,7 @@ const Wardrobe = (() => {
         const colorName = legacy ? "" : item?.colorName;
         const warmth = beforeWeather ? "auto" : item?.warmth;
         const protection = beforeWeather ? "unknown" : item?.protection;
-        const photo = raw.version === 4 ? item?.photo : undefined;
+        const photo = raw.version >= 4 ? item?.photo : undefined;
         check(object(item) && idValue(item.id) && !itemsById.has(item.id) && nameValue(item.name, 48) &&
           has(slots, category) && has(slots[category].cuts, item.cut) &&
           has(colors, item.color) && has(styles, item.style) && has(patterns, pattern) && has(fits, fit) &&
@@ -196,7 +203,7 @@ const Wardrobe = (() => {
           seenPhotos.add(photo);
           clean.photo = photo;
         }
-        if (raw.version === 4 && item.soleColor !== undefined) {
+        if (raw.version >= 4 && item.soleColor !== undefined) {
           check(category === "shoes" && validHex(item.soleColor), label + "Kleidungsstück " + (i + 1) + " hat eine ungültige Sohlenfarbe.");
           clean.soleColor = item.soleColor.toLowerCase();
         }
@@ -218,6 +225,27 @@ const Wardrobe = (() => {
         return result;
       }
 
+      function cleanContext(value) {
+        check(object(value) && has(occasions, value.occasion) && has(dressCodes, value.dressCode),
+          label + "Anlass oder Dresscode ist ungültig.");
+        return { occasion: value.occasion, dressCode: value.dressCode };
+      }
+
+      const pieces = cleanPieces(profile.pieces);
+      const planning = beforePlanning ? basePlan() : profile.plan;
+      const context = cleanContext(planning);
+      check(Array.isArray(planning.fixed) && planning.fixed.length <= mainKeys.length && planning.fixed.every(idValue) &&
+        new Set(planning.fixed).size === planning.fixed.length, label + "Die fixierten Kleidungsstücke sind ungültig.");
+      check(Array.isArray(planning.recent) && planning.recent.length <= MAX_RECENT_LOOKS,
+        label + "Der Vorschlagsverlauf ist ungültig oder zu groß.");
+      const recent = planning.recent.map((entry) => {
+        const context = cleanContext(entry);
+        check(Array.isArray(entry.ids) && entry.ids.length === mainKeys.length && entry.ids.every((id) => id === null || idValue(id)),
+          label + "Der Vorschlagsverlauf enthält einen ungültigen Look.");
+        return { ...context, ids: entry.ids };
+      }).filter(({ ids }) => ids.some(Boolean) && ids.every((id, index) => id === null || itemsById.get(id)?.category === mainKeys[index]));
+      const plan = { ...context, fixed: planning.fixed.filter((id) => mainKeys.some((key) => pieces[key] === id)), recent };
+
       check(Array.isArray(profile.looks) && profile.looks.length <= MAX_LOOKS, label + "Die Liste gespeicherter Looks ist ungültig oder zu groß.");
       const lookIds = new Set();
       const looks = profile.looks.map((look, i) => {
@@ -226,14 +254,15 @@ const Wardrobe = (() => {
         lookIds.add(look.id);
         const pieces = cleanPieces(look.pieces);
         check(keys.some((key) => pieces[key]), label + "Ein gespeicherter Look enthält kein Kleidungsstück.");
-        return { id: look.id, name: look.name.trim(), pieces };
+        const context = !beforePlanning && look.context !== undefined ? cleanContext(look.context) : undefined;
+        return { id: look.id, name: look.name.trim(), pieces, ...(context ? { context } : {}) };
       });
       return { id: profile.id, name: profile.name.trim(), figure: profile.figure, avatar: { hair: avatar.hair, skin: avatar.skin.toLowerCase(), hairColor: avatar.hairColor.toLowerCase() },
         measures: { ...recorded }, weather: { temperature: weather.temperature, sky: weather.sky, precipitation: weather.precipitation, wind: weather.wind },
-        items, looks, pieces: cleanPieces(profile.pieces), style: profile.style, matchOnly: profile.matchOnly };
+        items, looks, pieces, style: profile.style, matchOnly: profile.matchOnly, plan };
     });
     check(seenProfiles.has(raw.active), "Das aktive Profil fehlt in dieser Sicherung.");
-    return { version: 4, active: raw.active, profiles };
+    return { version: 5, active: raw.active, profiles };
   }
 
   function newId() {
@@ -397,11 +426,12 @@ const Wardrobe = (() => {
     profile.looks = profile.looks.map((look) => ({ ...look, pieces: move(look.pieces) }));
   }
 
-  function suggestOutfit(profile) {
+  function completeOutfit(profile) {
     const worn = outfit(profile);
     const clothes = Object.fromEntries(mainKeys.map((key) => [key, worn[key]]));
     const weather = profile.weather;
     const outlook = Weather.conditions(weather);
+    const fixed = new Set(profile.plan.fixed);
     function option(key, excluded) {
       let best;
       for (const item of profile.items) {
@@ -415,6 +445,7 @@ const Wardrobe = (() => {
     let added = 0;
     for (const key of ["top", "bottom", "shoes", "mid", "layer"]) {
       const existing = clothes[key];
+      if (existing && fixed.has(existing.id)) continue;
       const wanted = key === "mid" ? !clothes.top || outlook?.mid : key === "layer" ? !outlook || outlook.layer : true;
       const rating = existing && Weather.assess(existing, weather, outlook);
       if (existing && !rating.weak && !(outlook?.wet && ["layer", "shoes"].includes(key))) continue;
@@ -431,19 +462,11 @@ const Wardrobe = (() => {
     }
     const pieces = piecesOf({ ...worn, ...clothes });
     if (mainKeys.some((key) => pieces[key] !== profile.pieces[key])) return { pieces, added };
-
-    const equipped = ["layer", "shoes", "bottom", "mid", "top"].filter((key) => clothes[key] &&
-      (!outlook || (key !== "mid" || outlook.mid) && (key !== "layer" || outlook.layer)));
-    for (const key of equipped) {
-      const item = option(key, clothes[key].id);
-      if (!item || (outlook && Weather.assess(item, weather, outlook).score + .5 < Weather.assess(clothes[key], weather, outlook).score)) continue;
-      return { pieces: piecesOf({ ...worn, [key]: item }), alternative: item.name };
-    }
     return null;
   }
 
-  return { slots, keys, mainKeys, accessoryKeys, styles, figures, colors, haircuts, measurements, fits, patterns, validHex, validMeasure,
+  return { slots, keys, mainKeys, accessoryKeys, styles, occasions, dressCodes, figures, colors, haircuts, measurements, fits, patterns, validHex, validMeasure,
     baseAvatar, itemColor, styleName, defaults, validated, outfit, piecesOf, emptyPieces, newId,
-    nameValue, parseDecimal, searchFor, rate, outfitTip, removeItemReferences, moveItemReferences, suggestOutfit,
-    MAX_ITEMS, MAX_LOOKS, MAX_FILE };
+    nameValue, parseDecimal, searchFor, rate, outfitTip, removeItemReferences, moveItemReferences, completeOutfit,
+    pair, styleMatch, coveredByKnit, MAX_ITEMS, MAX_LOOKS, MAX_FILE, MAX_RECENT_LOOKS };
 })();

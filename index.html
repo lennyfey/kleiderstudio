@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="./style.css">
   <script src="./weather.js" defer></script>
   <script src="./data.js" defer></script>
+  <script src="./look-planner.js" defer></script>
   <script src="./drawing.js" defer></script>
   <script src="./reference-image.js" defer></script>
   <script src="./photo-store.js" defer></script>
@@ -60,11 +61,21 @@
               <button class="icon-button" type="button" data-action="reset" title="Outfit zurücksetzen" aria-label="Outfit zurücksetzen"><span data-icon="reset"></span></button>
             </div>
           </div>
+          <div class="look-settings fields-pair">
+            <label class="field"><span>Anlass</span><select id="look-occasion"></select></label>
+            <label class="field"><span>Dresscode</span><select id="look-dresscode" aria-describedby="look-auto-dress"></select></label>
+            <p class="look-auto-dress" id="look-auto-dress" hidden></p>
+          </div>
           <div class="stage">
             <div class="stage-grid" aria-hidden="true"></div>
             <canvas id="avatar" width="480" height="600" role="img" aria-label="Figur mit aktuellem Outfit"></canvas>
             <div class="stage-colors" id="stage-colors" aria-hidden="true"></div>
           </div>
+          <div class="figure-actions">
+            <button class="button" type="button" data-action="suggest"><span data-icon="sparkles"></span><span id="suggest-label">Look vorschlagen</span></button>
+            <button class="button primary" type="button" data-action="review-look"><span data-icon="check"></span>Look bestätigen</button>
+          </div>
+          <p class="look-feedback" id="look-feedback" role="status" hidden></p>
           <button class="weather-control" type="button" data-action="edit-weather">
             <span class="weather-symbol" data-icon="cloud"></span>
             <span><strong id="weather-summary">Wetter eingeben</strong><small id="weather-caption">Für passende Look-Vorschläge</small></span>
@@ -72,11 +83,8 @@
           </button>
           <div class="outfit-slots" id="outfit-slots" aria-label="Angezogene Teile"></div>
           <div class="outfit-slots accessory-slots" id="accessory-slots" aria-label="Angezogene Accessoires" hidden></div>
-          <div class="figure-actions">
-            <button class="button primary" type="button" data-action="save-look"><span data-icon="bookmark"></span>Look speichern</button>
-            <button class="button" type="button" data-action="suggest"><span data-icon="sparkles"></span><span id="suggest-label">Look vorschlagen</span></button>
-          </div>
           <div class="figure-utils">
+            <button class="text-button" type="button" data-action="fix-pieces" id="fix-pieces"><span data-icon="lock"></span><span id="fixed-label">Teile fixieren</span></button>
             <button class="text-button" id="undo-outfit" type="button" data-action="undo-outfit" aria-label="Letzte Outfit-Änderung rückgängig machen" hidden><span data-icon="reset"></span>Rückgängig</button>
             <button class="text-button wardrobe-jump" type="button" data-action="show-wardrobe"><span data-icon="hanger"></span>Teile wählen</button>
           </div>
@@ -211,10 +219,14 @@
   <footer class="site-footer"><span data-icon="hanger"></span><span>Kleiderstudio</span><span class="footer-divider"></span><span id="save-status">Auf diesem Gerät gespeichert</span></footer>
   <dialog id="editor" aria-labelledby="editor-title">
     <form id="editor-form" novalidate>
-      <div class="modal-heading"><h2 id="editor-title"></h2><button type="button" class="icon-button" data-action="close-dialog" aria-label="Schließen"><span data-icon="close"></span></button></div>
+      <div class="modal-heading"><h2 id="editor-title" tabindex="-1"></h2><button type="button" class="icon-button" data-action="close-dialog" aria-label="Schließen"><span data-icon="close"></span></button></div>
       <div id="editor-fields"></div>
       <p id="editor-error" class="form-error" role="alert" hidden></p>
-      <div class="modal-actions"><button type="button" class="button" data-action="close-dialog">Abbrechen</button><button type="submit" class="button primary" id="editor-submit">Speichern</button></div>
+      <div class="modal-actions">
+        <button type="button" class="button" id="editor-cancel" data-action="close-dialog">Abbrechen</button>
+        <button type="button" class="button primary" id="summary-save" data-action="save-look" hidden><span data-icon="bookmark"></span>Look speichern</button>
+        <button type="submit" class="button primary" id="editor-submit">Speichern</button>
+      </div>
     </form>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>

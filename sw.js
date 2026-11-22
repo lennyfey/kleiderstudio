@@ -1,9 +1,9 @@
 "use strict";
 
 const cachePrefix = "kleiderstudio:" + self.registration.scope + ":";
-const cacheName = cachePrefix + "15";
+const cacheName = cachePrefix + "16";
 const assets = [
-  "./index.html", "./style.css", "./weather.js", "./data.js", "./drawing.js", "./reference-image.js",
+  "./index.html", "./style.css", "./weather.js", "./data.js", "./look-planner.js", "./drawing.js", "./reference-image.js",
   "./photo-store.js", "./photo-weights.js", "./photo-recognition.js", "./fitting.js", "./app.js",
   "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"
 ].map((file) => new URL(file, self.registration.scope).href);
